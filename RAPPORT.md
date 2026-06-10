@@ -1,207 +1,567 @@
-# Rapport de présentation du projet
-# ESP32-CAM — Système intelligent de surveillance, de contrôle à distance et de gestion de l'éclairage
+# 📄 Rapport Technique — Système Domotique Intelligent ESP32-CAM
+
+> Documentation technique complète du projet.  
+> Pour la présentation générale, les fonctionnalités et le matériel requis, voir le [README](./README.md).
 
 ---
 
-## 1. Présentation générale
+## 📋 Table des matières
 
-Ce projet est un système embarqué intelligent multi-fonctions conçu autour d'une caméra connectée (ESP32-CAM AI Thinker). Il combine trois grandes capacités en un seul dispositif compact et peu coûteux :
-
-1. **La surveillance vidéo en temps réel** — visualisation du flux caméra depuis n'importe quel navigateur
-2. **Le contrôle à distance d'équipements** — allumer, éteindre ou piloter des appareils électriques via WiFi
-3. **La gestion intelligente de l'éclairage** — automatisation basée sur la détection de présence par intelligence artificielle
-
-Dans le cadre de ce projet, le test concret a été réalisé avec le **contrôle d'une lumière** : le système peut allumer ou éteindre une lampe automatiquement selon la présence détectée, ou manuellement depuis l'interface web, exactement comme le ferait un interrupteur physique — mais accessible depuis un téléphone ou un ordinateur, n'importe où dans le bâtiment, sans se déplacer.
-
-Le système a été entièrement conçu, développé et testé dans le laboratiore Fablab de BURKINA BUISINESS INCUBATOR, avec des composants électroniques standards et accessibles, dans l'objectif de produire une solution réplicable et adaptée au contexte africain.
-
----
-
-## 2. Contexte et problèmes identifiés
-
-### 2.1 Un manque criant de solutions intelligentes accessibles en Afrique
-
-L'Afrique fait face à plusieurs défis technologiques simultanés dans la gestion des bâtiments et des espaces :
-
-- **L'éclairage non contrôlé** : les lumières restent allumées en permanence dans les bureaux, couloirs, salles de classe et espaces communs, même en l'absence totale d'occupants
-- **L'absence de surveillance abordable** : de nombreux espaces (entrepôts, bureaux, locaux techniques) ne sont pas surveillés faute de systèmes accessibles financièrement
-- **Le contrôle manuel limité** : pour allumer ou éteindre un équipement, il faut physiquement se déplacer jusqu'à l'interrupteur ou au tableau électrique
-- **Le coût prohibitif des solutions professionnelles** : les systèmes domotiques et de vidéosurveillance du marché mondial sont conçus pour des marchés à hauts revenus et restent inaccessibles les deux ne sont pas fait ensemble donc les entreprises sont obligé de les acheter ensemble
-
-### 2.2 La réalité énergétique
-
-L'Afrique subsaharienne fait face à une crise énergétique structurelle. Les coupures de courant sont fréquentes, les coûts élevés, et l'infrastructure fragile. Dans ce contexte, chaque kilowattheure compte. Une ampoule de 60W laissée allumée inutilement 8h/jour représente environ 175 kWh gaspillés par an — par pièce, par an — soit plusieurs dizaines de milliers de francs CFA en factures inutiles.
-
-### 2.3 La surveillance : un besoin réel sans solution locale abordable
-
-Les caméras de surveillance professionnelles (CCTV, caméras IP) nécessitent une infrastructure réseau dédiée, un enregistreur numérique, et souvent un abonnement à un service cloud étranger. Pour une petite entreprise, une école ou une association en Afrique, ces coûts sont souvent insupportables. Il n'existait pas de solution simple, locale et peu coûteuse permettant à la fois de surveiller un espace et de contrôler ses équipements depuis un téléphone.
+1. [Contexte et genèse du projet](#1-contexte-et-genèse-du-projet)
+2. [Évolution technique : les tentatives abandonnées](#2-évolution-technique--les-tentatives-abandonnées)
+3. [Architecture logicielle détaillée](#3-architecture-logicielle-détaillée)
+4. [Entraînement du modèle IA sur Edge Impulse](#4-entraînement-du-modèle-ia-sur-edge-impulse)
+5. [Solutions aux problèmes techniques majeurs](#5-solutions-aux-problèmes-techniques-majeurs)
+6. [Guide d'installation complet](#6-guide-dinstallation-complet)
+7. [Guide d'utilisation](#7-guide-dutilisation)
+8. [Structure du dépôt](#8-structure-du-dépôt)
+9. [Références](#9-références)
 
 ---
 
-## 3. La solution développée
+## 1. Contexte et genèse du projet
 
-### 3.1 Un seul dispositif, trois fonctions majeures
+Ce système a été conçu et réalisé au **FabLab du Burkina Business Incubator (BBI)** à Ouagadougou, dans le cadre d'un stage de fin de cycle de Licence en Génie Électrique (option Électronique et Informatique Industrielle) à l'**Université de Technologies et de Management (UTM)**.
 
-Ce système répond simultanément aux trois problèmes identifiés avec un seul dispositif installé dans un espace :
+Le point de départ était concret : la salle de réunion du FabLab restait régulièrement avec lumières et équipements allumés alors qu'elle était vide. Personne ne le faisait exprès — c'est simplement ce qui arrive quand plusieurs personnes partagent un espace commun.
+
+**Contraintes spécifiques au contexte burkinabè :**
+
+- Connexion internet instable → le système doit fonctionner **sans cloud**
+- Budget limité → composants disponibles localement à Ouagadougou (~13 000 FCFA pour l'ESP32-CAM)
+- Coupures de courant fréquentes → système devant redémarrer proprement et automatiquement
+- Besoin de reproductibilité → tout le code et la doc sont ouverts et documentés
+
+---
+
+## 2. Évolution technique : les tentatives abandonnées
+
+Comprendre pourquoi les premières approches ont été abandonnées est essentiel pour comprendre les choix finaux.
+
+### 2.1 Tentative 1 — Capteur PIR
+
+**Principe :** détection des variations de chaleur corporelle.
+
+**Problèmes rencontrés :**
+- Calibration fastidieuse (trop ou pas assez sensible selon la température ambiante)
+- Portée limitée : une personne assise dans un coin de la salle n'était pas détectée
+- Impossible de compter le nombre de personnes présentes
+
+**Conclusion :** abandonné. Le PIR est utile pour les couloirs et petits espaces, pas pour une grande salle.
+
+---
+
+### 2.2 Tentative 2 — Capteurs à ultrasons HC-SR04
+
+**Principe :** deux capteurs à l'entrée pour compter les entrées et sorties, déduire le sens du mouvement selon lequel se déclenche en premier.
+
+**Problèmes rencontrés :**
+- Une personne s'arrêtant devant la porte → fausse détection
+- Deux personnes entrant simultanément → compteur perd le fil
+- Coupure de courant → compteur réinitialisé à zéro, toutes les données perdues
+- Plusieurs jours de corrections dans le code insuffisants → l'approche elle-même était fragile
+
+**Conclusion :** abandonné. La logique de comptage entrées/sorties est trop fragile dans un environnement réel.
+
+---
+
+### 2.3 Tentative 3 — OV7670 + Python + YOLO sur ordinateur
+
+**Principe :** caméra OV7670 couplée au modèle YOLO tournant sur un ordinateur connecté en permanence.
+
+**Problèmes rencontrés :**
+- Qualité d'image de l'OV7670 insuffisante pour une détection fiable
+- Nécessité d'un ordinateur allumé en permanence → consommation énergétique absurde pour un système censé résoudre un problème d'économie d'énergie
+
+**Conclusion :** abandonné. La dépendance à un ordinateur externe contredit l'objectif d'autonomie.
+
+---
+
+### 2.4 Solution finale — ESP32-CAM + Edge Impulse ✅
+
+La nette supériorité de la qualité d'image de l'ESP32-CAM par rapport à l'OV7670 a été le déclic. Un module qui détecte déjà des visages avec son code de base peut faire tourner un modèle de détection de présence personnalisé.
+
+Edge Impulse, découvert lors de recherches complémentaires, a apporté la pièce manquante : entraîner un modèle IA et le déployer directement sur microcontrôleur, sans écrire une seule ligne de code d'apprentissage automatique.
+
+---
+
+## 3. Architecture logicielle détaillée
+
+### 3.1 Vue d'ensemble du code
+
+Le code principal tourne sur l'ESP32-CAM sous **Arduino IDE** en C/C++, structuré autour de **FreeRTOS** pour la gestion multitâche sur les deux cœurs du processeur.
+
+```
+main.ino
+├── setup()                    ← Initialisation unique au démarrage
+│   ├── Initialisation caméra
+│   ├── Connexion WiFi + IP fixe
+│   ├── Synchronisation NTP
+│   ├── Montage carte SD
+│   ├── Configuration GPIO (relais, servo, LDR)
+│   └── Création des tâches FreeRTOS
+│
+└── Tâches FreeRTOS (loop() non utilisé)
+    ├── taskCapture()          ← Cœur 1 : capture image → tampon partagé
+    ├── taskInference()        ← Cœur 0 : analyse IA + contrôle équipements
+    └── taskWifi()             ← Cœur 0 : serveur web + alertes Telegram
+```
+
+### 3.2 Gestion des ressources partagées
+
+Plusieurs tâches accèdent aux mêmes données. Les conflits sont évités par deux mécanismes FreeRTOS :
+
+| Ressource partagée | Mécanisme de protection |
+|---|---|
+| Tampon d'images (capture → inférence) | Sémaphore binaire |
+| État du relais (inférence ↔ web) | Mutex |
+| Position du servomoteur (inférence ↔ web) | Mutex |
+| Compteur de détections (inférence ↔ web) | Mutex |
+| État LDR (inférence → web) | Variable volatile |
+
+### 3.3 Logique de détection complète
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
+│  taskInference() — toutes les 2 secondes                    │
 │                                                             │
-│   SURVEILLANCE VIDÉO            CONTRÔLE À DISTANCE        │
-│   ─────────────────             ─────────────────          │
-│   Flux vidéo live en            Allumer / éteindre         │
-│   temps réel depuis             équipements depuis         │
-│   tout navigateur WiFi          téléphone ou PC            │
-│                                                             │
-│               ┌──────────────────────┐                     │
-│               │   ESP32-CAM          │                     │
-│               │   + Servo + Relais   │                     │
-│               └──────────────────────┘                     │
-│                                                             │
-│   GESTION INTELLIGENTE          DÉTECTION IA               │
-│   ─────────────────             ──────────                 │
-│   Éclairage automatique         Analyse d'image            │
-│   selon présence humaine        embarquée, sans cloud      │
-│                                                             │
+│  1. Récupère image depuis tampon (sémaphore)                │
+│  2. Lance inférence FOMO sur image 96×96px                  │
+│  3. Confiance > 90% ?                                       │
+│       NON  → reset compteur si > 10s sans détection         │
+│       OUI  → compteur_détections++                          │
+│  4. compteur >= 2 ET temps_écoulé < 10s ?                   │
+│       NON  → attendre                                       │
+│       OUI  → PRÉSENCE CONFIRMÉE                             │
+│              → Allumer relais (GPIO 14)                     │
+│              → Reset chrono extinction (4 min)              │
+│              → Si plage alerte → envoyer Telegram + SD      │
+│  5. Chrono extinction écoulé (4 min sans détection) ?       │
+│       OUI  → Éteindre relais                                │
+│  6. Vérifier LDR (GPIO 15) → état réel == commande ?        │
+│       NON  → corriger commande                              │
 └─────────────────────────────────────────────────────────────┘
 ```
 
-### 3.2 La surveillance vidéo en temps réel
+### 3.4 Logique des plages d'alerte
 
-Le système diffuse un flux vidéo continu (format MJPEG) accessible depuis n'importe quel navigateur web connecté au réseau WiFi local. Aucune application à installer, aucun compte à créer, aucun abonnement nécessaire. Il suffit d'ouvrir un navigateur et de saisir l'adresse IP du dispositif.
+```
+Est-ce une heure d'alerte ?
+│
+├─ Mode absence activé ?       → OUI → Alerte
+│
+├─ Heure entre 22h et 6h ?     → OUI → Alerte
+│
+├─ Jour = samedi ou dimanche ? → OUI → Alerte
+│
+└─ Date = jour férié (liste interface web) ? → OUI → Alerte
 
-La caméra est montée sur un servo moteur qui effectue un balayage panoramique automatique de 0° à 100°, ce qui élargit considérablement le champ de surveillance par rapport à une caméra fixe. L'opérateur peut également orienter manuellement la caméra depuis l'interface web pour inspecter un angle précis à la demande.
+Sinon → Pas d'alerte (journée normale de semaine)
+```
 
-Cette fonctionnalité répond directement au besoin de surveillance d'espaces (bureaux, salles, entrepôts, entrées de bâtiments) sans investir dans une infrastructure de vidéosurveillance coûteuse.
+### 3.5 Lecture numérique de la LDR (sans ADC)
 
-### 3.3 Le contrôle à distance d'équipements — le test avec la lumière
+L'activation de la caméra désactive l'ADC de l'ESP32-CAM sur toutes les broches, rendant impossible une lecture analogique classique. Solution adoptée :
 
-Le cœur de la démonstration pratique de ce projet est le **contrôle à distance d'une lumière via un relais électronique**. Le relais fonctionne comme un interrupteur commandé électroniquement : il peut couper ou rétablir le courant dans un circuit électrique sur ordre du microcontrôleur.
+```
+        VCC (3.3V)
+            │
+         [LDR]          ← résistance variable selon lumière
+            │
+         GPIO 15  ←── lecture numérique HIGH/LOW
+            │
+        [5 kΩ fixe]     ← fixe le seuil de détection
+            │
+          GND
 
-Depuis l'interface web, l'utilisateur dispose de trois modes de contrôle :
+Lumière allumée → LDR faible résistance → tension au point milieu → HIGH
+Lumière éteinte → LDR haute résistance → tension chute → LOW
+```
 
-- **Mode manuel — Allumer** : équivaut à appuyer sur l'interrupteur physique pour allumer la lumière, depuis n'importe où via WiFi
-- **Mode manuel — Éteindre** : équivaut à appuyer sur l'interrupteur physique pour éteindre la lumière, à distance
-- **Mode automatique (IA)** : confier entièrement le contrôle au système intelligent qui gère la lumière selon la présence détectée
-
-Un point important : **la compatibilité avec l'interrupteur physique est maintenue**. Il est toujours possible d'allumer ou d'éteindre la lumière avec l'interrupteur normal installé dans la pièce. Le système détecte automatiquement ce changement d'état grâce au capteur LDR intégré et met à jour l'interface en conséquence. L'utilisateur n'a donc pas à choisir entre le contrôle physique et le contrôle à distance — les deux fonctionnent ensemble, de façon complémentaire.
-
-Ce principe est fondamental et extensible : bien que le test ait été réalisé avec une lumière, **le même relais peut contrôler n'importe quel équipement électrique** — un ventilateur, une pompe à eau, une sirène d'alarme, un système d'arrosage, un portail électrique, ou tout autre appareil fonctionnant sur secteur. Le projet pose ainsi les bases d'un système de contrôle à distance universel pour équipements électriques.
-
-### 3.4 La gestion intelligente par IA embarquée
-
-Un modèle d'intelligence artificielle entraîné sur la plateforme Edge Impulse est déployé directement sur le microcontrôleur, sans connexion à un serveur distant ni cloud. Ce modèle analyse chaque image capturée et détermine si une personne est présente ou non dans le champ de vision, avec un niveau de confiance calculé.
-
-- Si une personne est détectée avec plus de 80% de confiance → la lumière s'allume automatiquement
-- Si aucune présence n'est détectée pendant 3 minutes consécutives → la lumière s'éteint seule
-- Entre 22h et 6h → le système entre en mode nuit, réduit son activité et économise l'énergie
-
-Le traitement étant entièrement local, **aucune image n'est envoyée à l'extérieur**, ce qui garantit la confidentialité des occupants et le fonctionnement même sans accès internet.
-
----
-
-## 4. Les apports concrets du projet
-
-### 4.1 Apport pour la surveillance et la sécurité
-
-Pour toute structure qui ne peut pas se permettre un système de vidéosurveillance professionnel, ce dispositif offre une alternative concrète et immédiatement opérationnelle. Il permet de :
-
-- Surveiller visuellement un espace en temps réel depuis un téléphone ou un ordinateur
-- Détecter automatiquement une présence inattendue dans un espace
-- Orienter la caméra à la demande pour inspecter n'importe quel angle de la pièce
-- Combiner surveillance vidéo et contrôle d'équipements dans un seul appareil
-- Fonctionner sans infrastructure réseau dédiée, sans enregistreur, sans abonnement
-
-C'est une réponse directe au besoin de sécurité basique qui existe dans des milliers de structures africaines (bureaux, écoles, boutiques, entrepôts) qui n'ont aujourd'hui aucun moyen de surveillance.
-
-### 4.2 Apport pour le contrôle à distance
-
-La capacité à contrôler un équipement électrique à distance sans se déplacer représente un gain de confort, de temps et d'efficacité opérationnelle. Dans un contexte où un responsable peut gérer plusieurs espaces simultanément, pouvoir allumer ou éteindre un équipement depuis son téléphone — sans se lever, sans se déplacer dans le couloir ou dans une autre salle — est un apport concret et mesurable.
-
-Cette capacité prend encore plus de valeur dans des contextes spécifiques :
-- **Sécurité** : pouvoir éteindre à distance un équipement oublié allumé en quittant les locaux
-- **Urgence** : couper rapidement l'alimentation d'un appareil en cas de problème détecté à distance
-- **Gestion multi-sites** : un responsable peut contrôler des équipements dans plusieurs bâtiments depuis un seul endroit
-
-### 4.3 Apport pour l'efficacité énergétique
-
-L'automatisation de l'extinction de la lumière dès qu'un espace est vide élimine quasi totalement le gaspillage lié aux oublis, sans changer les habitudes des occupants ni nécessiter leur intervention. Pour un espace de bureau standard :
-
-| Scénario | Consommation gaspillée/an | Coût estimé (FCFA) |
-|----------|--------------------------|-------------------|
-| Sans système (oublis fréquents) | ~175 kWh | ~35 000 FCFA perdus |
-| Avec ce système | ~0 kWh | Économie totale |
-| Coût du dispositif | — | ~15 000 FCFA |
-| Retour sur investissement | — | Moins de 6 mois |
-
-### 4.4 Apport technologique
-
-Ce projet démontre qu'il est possible de faire fonctionner de l'intelligence artificielle embarquée sur un microcontrôleur qui coûte moins de 5 euros. C'est une rupture importante par rapport à l'idée reçue que l'IA nécessite des serveurs puissants et des infrastructures coûteuses. Ici, l'IA tourne localement, en temps réel, sur un composant de la taille d'une carte de visite, analysant des images à raison de 2 fois par seconde.
-
-Le système utilise FreeRTOS, un système d'exploitation temps réel, pour faire tourner trois tâches simultanément sur les deux cœurs du processeur : la capture vidéo, l'analyse IA, et la gestion du réseau WiFi. Cette architecture garantit la fluidité du streaming vidéo même pendant que l'IA analyse les images en arrière-plan.
-
-### 4.5 Apport pour l'autonomie et la souveraineté numérique
-
-En Afrique, la dépendance aux services cloud étrangers est un frein majeur : coûts en devises, latence réseau, dépendance à une connexion internet stable, risques de confidentialité des données. Ce projet propose une approche radicalement différente : **tout fonctionne localement**, sur le réseau WiFi interne du bâtiment, sans aucune dépendance externe. Les données, les images, les décisions — tout reste sur place.
-
-### 4.6 Apport pédagogique et de transfert de compétences
-
-Ce projet est entièrement documenté, open source, et conçu pour être reproductible. Il constitue une ressource pédagogique complète couvrant simultanément la programmation embarquée, l'intelligence artificielle, les systèmes temps réel, le développement web, et l'électronique pratique. N'importe quel technicien ou développeur peut s'en inspirer, le reproduire, ou l'adapter à un nouveau besoin.
+La résistance fixe de 5 kΩ joue le même rôle qu'un potentiomètre de sensibilité, en filtrant la lumière ambiante et en évitant les faux positifs.
 
 ---
 
-## 5. Applications et cas d'usage
+## 4. Entraînement du modèle IA sur Edge Impulse
 
-### 5.1 Bâtiments publics et administratifs
-Bureaux, mairies, préfectures, couloirs — surveillance visuelle, extinction automatique de l'éclairage, contrôle d'équipements à distance.
+### 4.1 Créer un compte et un projet Edge Impulse
 
-### 5.2 Établissements scolaires et universitaires
-Salles de classe, amphithéâtres, bibliothèques — gestion de l'éclairage en dehors des heures de cours, surveillance des espaces sensibles, réduction des factures d'électricité.
+1. Aller sur [studio.edgeimpulse.com](https://studio.edgeimpulse.com)
+2. Créer un compte gratuit
+3. Créer un nouveau projet → lui donner un nom (ex: `EconomieEnergieBBI`)
 
-### 5.3 Établissements de santé
-Hôpitaux, centres de santé — économie d'énergie dans les couloirs et espaces administratifs, surveillance des zones d'accès restreint, contrôle d'équipements à distance.
+### 4.2 Collecter les images
 
-### 5.4 Petites et moyennes entreprises
-Entrepôts, ateliers, boutiques — contrôle à distance des équipements, surveillance vidéo sans infrastructure coûteuse, gestion automatique de l'éclairage.
+Flasher la bibliothèque **EloquentESPCam** sur l'ESP32-CAM pour accéder à l'outil de capture :
 
-### 5.5 Logements et résidences
-Contrôle de l'éclairage depuis son téléphone, surveillance de l'entrée ou du séjour, gestion à distance lors d'une absence prolongée.
+```
+Croquis → Exemples → EloquentESPCam → collect_images_for_EdgeImpulse
+```
 
-### 5.6 Agriculture et espaces extérieurs
-En remplaçant la lumière par une pompe d'irrigation ou un système d'arrosage, le même dispositif peut contrôler des équipements agricoles à distance — ouvrant des perspectives importantes pour l'agriculture connectée en Afrique.
+Accéder à l'interface de capture depuis le navigateur → déclencher des rafales → télécharger le ZIP.
+
+**Recommandations pour la collecte :**
+- Capturer dans l'espace réel où le système sera déployé
+- Varier les positions : personnes debout, assises, partiellement visibles, dos tourné
+- Varier les conditions : lumière allumée, lumière éteinte, mi-journée, soir
+- Viser au minimum 300 images avec personnes et 300 images sans personne
+- Ratio conseillé : 80% entraînement / 20% test
+
+### 4.3 Étiqueter les images
+
+Sur Edge Impulse → **Data acquisition** → **Labeling queue** :
+
+- Dessiner une **bounding box** autour de chaque personne visible
+- Images sans personne → laisser sans bounding box
+- Ne pas étiqueter les parties de corps partielles comme des personnes complètes
+
+> ⚠️ La qualité du modèle dépend directement de la qualité des étiquettes. Un mauvais étiquetage produit un mauvais modèle. Prendre le temps de vérifier chaque image.
+
+### 4.4 Créer l'impulsion (pipeline)
+
+**Create impulse :**
+- Image width: `96`, Image height: `96`, Resize mode: `Fit shortest axis`
+- Processing block: **Image**
+- Learning block: **Object Detection (Images) — FOMO**
+
+**Image block :**
+- Color depth: `Grayscale` (réduit la mémoire utilisée)
+- Sauvegarder → **Generate features**
+
+### 4.5 Entraîner le modèle
+
+**Object Detection → Training settings :**
+- Number of training cycles: `60` (augmenter si le score F1 est insuffisant)
+- Learning rate: `0.001`
+- Data augmentation: activée
+
+Lancer l'entraînement → observer le score F1.
+
+**Interprétation du score F1 :**
+
+| Score F1 | Interprétation |
+|---|---|
+| < 70% | Insuffisant — revoir les étiquettes ou ajouter des images |
+| 70–80% | Acceptable — peut être amélioré |
+| 80–85% | Bon pour la détection de personnes en conditions réelles |
+| > 85% | Excellent |
+
+> Le score F1 obtenu sur ce projet est **83,1%** après correction des étiquettes et ajout d'images ciblées aux angles problématiques.
+
+### 4.6 Déployer sur l'ESP32-CAM
+
+**Deployment → Arduino library → Build** → télécharger le fichier ZIP.
+
+Dans Arduino IDE :
+```
+Croquis → Inclure une bibliothèque → Ajouter une bibliothèque .ZIP
+→ Sélectionner le fichier ZIP téléchargé
+```
 
 ---
 
-## 6. Limites actuelles et perspectives d'évolution
+## 5. Solutions aux problèmes techniques majeurs
 
-Tout projet honnête doit mentionner ses limites actuelles :
+### 5.1 Perturbations du relais simple (back-EMF)
 
-- La détection IA fonctionne mieux en conditions d'éclairage normales ; les performances peuvent baisser dans l'obscurité totale ou en contre-jour fort
-- Le flux vidéo et le contrôle sont accessibles uniquement sur le réseau WiFi local ; un accès depuis internet nécessiterait une configuration réseau supplémentaire
-- Le modèle IA actuel détecte la présence de façon binaire (présent / absent) ; il ne compte pas encore le nombre de personnes
-- La qualité vidéo (2MP) est suffisante pour la détection de présence, mais limitée pour une identification précise à grande distance
+**Symptôme :** l'ESP32-CAM redémarrait aléatoirement lors des commutations du relais.
 
-Ces limites sont des axes d'amélioration identifiés pour les versions futures :
+**Cause :** lorsqu'un relais commute, la bobine génère une surtension inverse (back-EMF) qui se propage dans le circuit et perturbe les composants voisins.
 
-- **Accès internet sécurisé** via VPN pour le contrôle hors du réseau local
-- **Comptage de personnes** et adaptation de l'intensité lumineuse
-- **Alertes push** sur téléphone lors de détections inattendues
-- **Enregistrement vidéo** sur carte SD lors de détections
-- **Contrôle multi-équipements** avec plusieurs relais indépendants
-- **Intégration solaire** pour une autonomie totale hors réseau électrique
+**Solution :** remplacer le module relais simple par un **module double relais**, mieux protégé contre ces phénomènes. Ses deux contacts NO et NF ont également permis le montage en va-et-vient avec l'interrupteur mural existant.
 
 ---
 
-## 7. Conclusion
+### 5.2 Instabilité de l'alimentation
 
-Ce projet représente bien plus qu'un système d'éclairage automatique. C'est une démonstration concrète qu'un seul dispositif compact, fabriqué avec des composants accessibles et développé localement, peut simultanément assurer la **surveillance vidéo** d'un espace, permettre le **contrôle à distance d'équipements électriques** comme s'il s'agissait d'un interrupteur connecté, et automatiser la **gestion intelligente de l'éclairage** grâce à l'intelligence artificielle embarquée.
+**Symptôme :** comportements erratiques lors des pics de consommation (commutation relais + inférence IA + WiFi simultanés).
 
-Il répond à des besoins réels et quotidiens : voir ce qui se passe dans un espace sans y être physiquement, contrôler un équipement sans se déplacer, ne plus payer pour de l'électricité gaspillée. Ces trois besoins existent dans des milliers de structures à travers toute l'Afrique, et ce projet prouve qu'il est possible d'y répondre  de matériel et un développement entièrement local.
-
-L'innovation technologique pertinente pour l'Afrique peut venir d'Afrique, avec des ressources locales, pour résoudre des problèmes locaux — et ce projet en est la preuve concrète.
+**Solution :** deux alimentations 5V/2A séparées, masses reliées :
+- Alimentation 1 → ESP32-CAM + LDR
+- Alimentation 2 → servomoteur + module relais
 
 ---
 
-*Projet développé au sein d'un centre d'incubation BURKINA BUISINNESS NCUBATOR, Afrique de l'Ouest.*
-*Auteur : ZANRE Abasse Dimitri — +226 67250288*
-*Année : 23/04/2026*
+### 5.3 Conflits mémoire entre bibliothèques
+
+**Symptôme :** plantages aléatoires, mémoire heap tombant à des valeurs critiques.
+
+**Diagnostic :** surveiller en temps réel via la page `/health` de l'interface web.
+
+**Solutions appliquées :**
+- Réduction de la résolution IA à 96×96 pixels (QVGA pour le flux vidéo, résolution réduite pour l'IA)
+- Utilisation du mode Grayscale pour les features Edge Impulse
+- Libération explicite des buffers après chaque inférence
+- Watchdog à 60 secondes pour redémarrage automatique en cas de blocage
+
+---
+
+### 5.4 Faux positifs du modèle IA
+
+**Symptôme :** le modèle détectait des présences alors que la salle était vide (score F1 initial : 80%).
+
+**Causes identifiées :**
+- Manque d'images de salle vide à certains angles de balayage du servomoteur
+- Erreurs d'étiquetage fournissant de fausses données au modèle
+
+**Solutions appliquées :**
+- Ajout d'images supplémentaires aux angles problématiques (via QR code Edge Impulse depuis smartphone)
+- Révision complète des étiquettes
+- Mise en place du mécanisme de double détection + seuil de confiance à 90%
+- Résultat : score F1 porté à **83,1%**
+
+---
+
+## 6. Guide d'installation complet
+
+### 6.1 Prérequis
+
+**Logiciels :**
+- [Arduino IDE 2.x](https://www.arduino.cc/en/software)
+- Compte [Edge Impulse](https://studio.edgeimpulse.com) (gratuit)
+- Compte [Telegram](https://telegram.org) pour les alertes
+
+**Package Arduino :**
+
+Dans Arduino IDE → `Fichier → Préférences → URL de gestionnaire de cartes supplémentaires` :
+```
+https://raw.githubusercontent.com/espressif/arduino-esp32/gh-pages/package_esp32_index.json
+```
+Puis `Outils → Type de carte → Gestionnaire de cartes` → rechercher **esp32** → installer **ESP32 by Espressif Systems**.
+
+---
+
+### 6.2 Créer le bot Telegram
+
+1. Ouvrir Telegram → rechercher **@BotFather**
+2. Envoyer `/newbot` → suivre les instructions → noter le **token**
+3. Rechercher **@userinfobot** → envoyer n'importe quel message → noter le **Chat ID**
+
+---
+
+### 6.3 Cloner le dépôt et configurer
+
+```bash
+git clone https://github.com/Zadus-Next-Helium-Service/Economie_Energie_Camera_ESP32CAM.git
+cd Economie_Energie_Camera_ESP32CAM
+```
+
+Ouvrir le fichier principal dans Arduino IDE et modifier les paramètres :
+
+```cpp
+// ── Réseau WiFi ──────────────────────────────────────────
+const char* WIFI_SSID     = "VOTRE_NOM_WIFI";
+const char* WIFI_PASSWORD = "VOTRE_MOT_DE_PASSE";
+
+// ── Adresse IP fixe ──────────────────────────────────────
+// Configurer aussi une réservation d'adresse côté routeur
+IPAddress LOCAL_IP(192, 168, X, X);
+IPAddress GATEWAY(192, 168, X, 1);
+IPAddress SUBNET(255, 255, 255, 0);
+
+// ── Telegram ─────────────────────────────────────────────
+const String BOT_TOKEN = "XXXXXXXXXX:XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX";
+const String CHAT_ID   = "XXXXXXXXXX";
+
+// ── NTP (fuseau horaire Ouagadougou = UTC+0) ─────────────
+const long  GMT_OFFSET_SEC    = 0;
+const int   DAYLIGHT_OFFSET   = 0;
+const char* NTP_SERVER        = "pool.ntp.org";
+
+// ── Paramètres de détection ───────────────────────────────
+const float CONFIDENCE_THRESHOLD = 0.90;  // Seuil de confiance IA
+const int   DETECTIONS_REQUIRED  = 2;     // Détections pour validation
+const int   DETECTION_WINDOW_MS  = 10000; // Fenêtre de temps (ms)
+const int   AUTO_OFF_DELAY_MS    = 240000;// Délai extinction (4 min)
+
+// ── Plages d'alerte nocturne ──────────────────────────────
+const int   NIGHT_HOUR_START = 22;
+const int   NIGHT_HOUR_END   = 6;
+```
+
+---
+
+### 6.4 Importer la bibliothèque Edge Impulse
+
+```
+Arduino IDE → Croquis → Inclure une bibliothèque → Ajouter une bibliothèque .ZIP
+→ Sélectionner votre fichier ZIP exporté depuis Edge Impulse
+```
+
+---
+
+### 6.5 Câblage
+
+```
+ESP32-CAM               Composant
+─────────────────────────────────────────────────────
+GPIO 13          →      Signal servomoteur (fil jaune/orange)
+GPIO 14          →      Signal module double relais (IN1)
+GPIO 15          →      Point milieu pont diviseur LDR
+GND              →      GND servomoteur + GND relais + GND LDR
+─────────────────────────────────────────────────────
+Alimentation 1 (5V/2A)  →  VCC ESP32-CAM-MB + VCC LDR
+Alimentation 2 (5V/2A)  →  VCC servomoteur + VCC relais
+GND des deux alimentations reliés ensemble
+─────────────────────────────────────────────────────
+Pont diviseur LDR :
+  3.3V → [LDR] → GPIO 15 → [5kΩ] → GND
+─────────────────────────────────────────────────────
+Module double relais (montage va-et-vient) :
+  Contact NO  → Phase vers ampoule
+  Contact NF  → Phase vers interrupteur mural existant
+  COM         → Phase secteur
+```
+
+> ⚠️ Travailler uniquement hors tension lors du câblage du relais sur le circuit 220V.
+
+---
+
+### 6.6 Téléverser le code
+
+1. Connecter l'ESP32-CAM-MB via câble Micro-USB
+2. Dans Arduino IDE :
+   ```
+   Outils → Type de carte → ESP32 Arduino → AI Thinker ESP32-CAM
+   Outils → Port → (sélectionner le bon port COM)
+   Outils → Vitesse de téléversement → 115200
+   ```
+3. Cliquer sur **Téléverser**
+4. Si le téléversement échoue → maintenir le bouton **BOOT** pendant l'upload
+5. Une fois terminé → appuyer sur **RESET**
+
+---
+
+### 6.7 Vérifier le démarrage
+
+Ouvrir le **Moniteur série** (115200 baud) — vous devriez voir :
+
+```
+Initialisation de la caméra... OK
+Connexion WiFi....... OK
+Adresse IP : 192.168.X.X
+Synchronisation NTP... OK
+Carte SD... OK
+Démarrage des tâches FreeRTOS...
+Système prêt.
+```
+
+Si la connexion WiFi échoue → vérifier les identifiants et redémarrer.
+
+---
+
+### 6.8 Accès à distance avec ngrok (optionnel)
+
+Installer ngrok sur un PC connecté au même réseau :
+
+```bash
+# Installation (Linux/Mac)
+wget https://bin.equinox.io/c/bNyj1mQVY4c/ngrok-v3-stable-linux-amd64.tgz
+tar xvzf ngrok-v3-stable-linux-amd64.tgz
+
+# Authentification (compte gratuit sur ngrok.com)
+./ngrok authtoken VOTRE_TOKEN_NGROK
+
+# Lancer le tunnel
+./ngrok http 192.168.X.X:80
+```
+
+L'URL publique générée (ex: `https://xxxx.ngrok.io`) donne accès à l'interface depuis n'importe où.
+
+> Pour une solution autonome sans PC, déployer ngrok sur un **Raspberry Pi** connecté au même réseau.
+
+---
+
+## 7. Guide d'utilisation
+
+### 7.1 Interface web — pages disponibles
+
+| URL | Contenu |
+|---|---|
+| `http://192.168.X.X` | Interface principale |
+| `http://192.168.X.X:81/stream` | Flux MJPEG seul |
+| `http://192.168.X.X/health` | Diagnostics système |
+| `http://192.168.X.X/status` | État JSON du système |
+
+### 7.2 Interface principale — commandes
+
+| Commande | Effet |
+|---|---|
+| Bouton ON/OFF | Allumer/éteindre manuellement le relais |
+| Slider servo | Déplacer la caméra (0° à 100° par pas de 10°) |
+| Toggle Auto/Manuel | Basculer le mode de contrôle |
+| Toggle Mode absence | Activer/désactiver les alertes permanentes |
+| Champ jours fériés | Ajouter/supprimer des dates d'alerte |
+
+### 7.3 Page /health — indicateurs à surveiller
+
+```json
+{
+  "uptime_s": 3600,
+  "heap_free": 45000,       ← Doit rester > 20 000 bytes
+  "heap_min": 38000,        ← Doit rester > 15 000 bytes
+  "detections": 12,
+  "ntp_sync": true,
+  "sd_ok": true,
+  "mode": "auto",
+  "light_state": "on"
+}
+```
+
+Si `heap_free` descend régulièrement sous 20 000 bytes → redémarrer le système et surveiller les fuites mémoire.
+
+### 7.4 Consultation des photos SD
+
+Retirer la carte microSD → la lire depuis un ordinateur. Les fichiers sont nommés :
+```
+YYYYMMDD_HHMMSS.jpg
+ex: 20260315_224532.jpg  → 15 mars 2026 à 22h45
+```
+
+---
+
+## 8. Structure du dépôt
+
+```
+Economie_Energie_Camera_ESP32CAM/
+│
+├── README.md                    ← Présentation générale du projet
+├── RAPPORT_TECHNIQUE.md         ← Ce document
+│
+├── src/
+│   └── main/
+│       └── main.ino             ← Code source principal
+│
+├── model/
+│   └── EconomieEnergieBBITEST.zip  ← Bibliothèque Edge Impulse exportée
+│
+├── hardware/
+│   ├── schema_cablage.png       ← Schéma de câblage complet
+│   └── boitier_freecad.FCStd   ← Fichier source FreeCAD du boîtier
+│
+├── boitier_3d/
+│   └── boitier.stl              ← Fichier STL pour impression 3D
+│
+└── videos/
+    ├── demo_detection.mp4       ← Démonstration de la détection IA
+    ├── demo_interface_web.mp4   ← Démonstration de l'interface web
+    └── demo_alerte_telegram.mp4 ← Démonstration des alertes
+```
+
+---
+
+## 9. Références
+
+| Référence | Lien |
+|---|---|
+| Edge Impulse Documentation | https://docs.edgeimpulse.com |
+| ESP32 by Espressif Systems | https://docs.espressif.com |
+| FreeRTOS Documentation | https://www.freertos.org/Documentation/RTOS_book.html |
+| Arduino IDE | https://www.arduino.cc/en/software |
+| FreeCAD | https://www.freecad.org |
+| ngrok | https://ngrok.com |
+| Telegram Bot API | https://core.telegram.org/bots/api |
+
+---
+
+*Réalisé au FabLab du Burkina Business Incubator — Ouagadougou, Burkina Faso — 2026*
