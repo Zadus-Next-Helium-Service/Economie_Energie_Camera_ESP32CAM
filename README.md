@@ -332,7 +332,9 @@ Les vidéos de démonstration du système en conditions réelles sont disponible
 Licence Professionnelle en Génie Électrique — Option Électronique et Informatique Industrielle  
 Université de Technologies et de Management (UTM) — Ouagadougou, Burkina Faso  
 Stage réalisé au **FabLab du Burkina Business Incubator (BBI)**  
+
 Professeur de Suivi : **M.COULIBALY Souleymane**,Enseignant à UTM
+
 Maître de stage : **OUEDRAOGO Mohamed Bassirou**, FabLab Manager
 
 ---
