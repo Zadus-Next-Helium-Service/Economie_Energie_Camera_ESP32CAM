@@ -1,222 +1,339 @@
+# 🏠 Système Domotique Intelligent — ESP32-CAM + IA Embarquée
 
-# ESP32-CAM — Surveillance, contrôle à distance et gestion intelligente de l'éclairage
-
-![Arduino](https://img.shields.io/badge/Arduino-ESP32-blue)
-![Edge Impulse](https://img.shields.io/badge/IA-Edge%20Impulse-orange)
-![FreeRTOS](https://img.shields.io/badge/OS-FreeRTOS-green)
-![Licence](https://img.shields.io/badge/Licence-MIT-yellow)
-![Plateforme](https://img.shields.io/badge/Plateforme-ESP32--CAM-red)
-
-> Système embarqué intelligent qui surveille un espace en temps réel, contrôle des équipements 
-> électriques à distance via WiFi, et gère automatiquement l'éclairage grâce à la détection de 
-> présence par intelligence artificielle — sans cloud, sans abonnement, depuis n'importe quel navigateur.
+> **Conception et réalisation d'un système domotique intelligent de surveillance vidéo et de contrôle d'équipements électriques par intelligence artificielle embarquée**  
+> Réalisé au FabLab du **Burkina Business Incubator (BBI)** — Ouagadougou, Burkina Faso  
+> Stage de fin de cycle — Licence Génie Électrique, option Électronique et Informatique Industrielle — UTM 2025-2026
 
 ---
 
-## Démonstration
+## 📋 Table des matières
 
-> Je mettrais l image plustard de l interface web
-
----
-
-## Fonctionnalités
-
-- **Surveillance vidéo en temps réel** — flux vidéo live accessible depuis tout navigateur WiFi
-- **Caméra orientable à distance** — servo panoramique contrôlable depuis l'interface web
-- **Contrôle à distance d'équipements** — allumer/éteindre comme un interrupteur connecté
-- **Compatibilité interrupteur physique** — l'interrupteur normal continue de fonctionner en parallèle
-- **Détection de personne par IA embarquée** — modèle Edge Impulse, seuil 80%, sans cloud
-- **Extinction automatique** — la lumière s'éteint seule après 3 minutes sans présence
-- **Mode nuit automatique** — synchronisation NTP, système en veille entre 22h et 6h
-- **Mode manuel / automatique** — basculement depuis l'interface web
-- **Diagnostics temps réel** — mémoire, uptime, erreurs, état complet du système
-- **Mémoire persistante** — configuration sauvegardée après redémarrage
+- [À propos du projet](#-à-propos-du-projet)
+- [Fonctionnalités](#-fonctionnalités)
+- [Matériel requis](#-matériel-requis)
+- [Architecture du système](#-architecture-du-système)
+- [Modèle IA embarquée](#-modèle-ia-embarquée)
+- [Modes de fonctionnement](#-modes-de-fonctionnement)
+- [Installation et configuration](#️-installation-et-configuration)
+- [Interface web](#-interface-web)
+- [Alertes Telegram](#-alertes-telegram)
+- [Résultats obtenus](#-résultats-obtenus)
+- [Perspectives d'amélioration](#-perspectives-damélioration)
+- [Démonstrations](#-démonstrations)
+- [Auteur](#-auteur)
 
 ---
 
-## Matériel nécessaire
+## 📖 À propos du projet
 
-| Composant | Quantité | Broche ESP32-CAM |
-|-----------|----------|-----------------|
-| ESP32-CAM AI Thinker | 1 | — |
-| Servo moteur 5V | 1 | GPIO 13 |
-| Module relais 5V | 1 | GPIO 14 |
-| Capteur LDR (numérique) | 1 | GPIO 15 |
-| Adaptateur FTDI | 1 | TX / RX (flash uniquement) |
-| Alimentation 5V / 2A | 1 | — |
+Ce projet est né d'une observation simple : la salle de réunion du FabLab du BBI restait régulièrement avec ses lumières et ses équipements allumés alors qu'elle était vide. Ce qui a commencé comme une idée d'économie d'énergie s'est transformé en un système domotique complet, intelligent et autonome.
 
----
+**Le problème central :**  
+Les systèmes de surveillance et de domotique disponibles au Burkina Faso sont coûteux, entièrement importés et dépendants de services cloud étrangers — alors que les besoins locaux sont réels : surveiller des locaux la nuit, éteindre automatiquement les équipements en l'absence d'occupants, recevoir une alerte en cas d'intrusion.
 
-## Installation
-
-L'installation se fait en **trois grandes étapes** : préparer Arduino IDE, installer les bibliothèques, 
-puis créer et importer le modèle IA Edge Impulse.
+**La réponse apportée :**  
+Un système qui fait tourner l'intelligence artificielle **directement sur le microcontrôleur**, sans connexion internet obligatoire, sans cloud étranger, avec des composants disponibles localement à Ouagadougou pour environ **13 000 FCFA** pour le composant principal.
 
 ---
 
-### Étape 1 — Installer Arduino IDE et le support ESP32
+## ✅ Fonctionnalités
 
-1. Télécharger et installer [Arduino IDE 2.x](https://www.arduino.cc/en/software)
-2. Ouvrir Arduino IDE → `Fichier → Préférences`
-3. Dans le champ **URL de gestionnaire de cartes supplémentaires**, ajouter :
-https://dl.espressif.com/dl/package_esp32_index.json
-4. Aller dans `Outils → Type de carte → Gestionnaire de cartes`
-5. Rechercher `esp32` et installer le package **ESP32 by Espressif Systems**
-6. Sélectionner la carte : `Outils → Type de carte → ESP32 Arduino → AI Thinker ESP32-CAM`
+### Surveillance vidéo
+- Flux vidéo **MJPEG en temps réel** accessible depuis tout navigateur WiFi (port 81)
+- Balayage panoramique de **0° à 100°** par pas de 10° grâce au servomoteur
+- Enregistrement automatique de **photos horodatées** sur carte microSD à chaque détection suspecte
 
-> Cette étape installe automatiquement toutes les bibliothèques système du projet :
-> `esp_camera`, `WiFi`, `esp_http_server`, `esp_heap_caps`, `esp_task_wdt`, `Preferences`, `time`
+### Détection de présence par IA embarquée
+- Modèle **FOMO (Faster Objects More Objects)** entraîné sur 740 images du FabLab du BBI
+- Inférence directement sur l'ESP32-CAM, **sans cloud, sans internet obligatoire**
+- Score F1 de **83,1%** obtenu après optimisation
+- **Seuil de confiance à 90%** pour éviter les faux positifs
+- **Double détection** : une présence est validée seulement si détectée 2 fois en moins de 10 secondes
 
----
+### Contrôle automatique des équipements
+- Allumage automatique des équipements dès qu'une présence est détectée
+- Extinction automatique après **4 minutes d'inactivité**
+- Retour d'état en temps réel via capteur **LDR** (vérification que l'état réel correspond à la commande)
+- Montage en **va-et-vient** avec l'interrupteur mural existant (qui continue de fonctionner normalement)
 
-### Étape 2 — Installer les bibliothèques Arduino
+### Interface web embarquée
+- Accessible depuis tout navigateur connecté au même réseau WiFi, **sans installation**
+- Adresse IP fixe configurable depuis le routeur
+- Contrôle en temps réel : allumage/extinction, déplacement du servomoteur, changement de mode
+- Gestion des **jours fériés** directement depuis l'interface (ajout/modification/suppression)
+- Page `/health` pour surveiller l'uptime, la mémoire heap, le nombre de détections et l'état NTP
 
-#### ESP32Servo — à installer depuis le gestionnaire Arduino
+### Alertes intelligentes
+- Envoi automatique via **API Telegram** d'une photo + lien direct vers l'interface web
+- Alertes actives la **nuit (22h–6h)**, les **weekends** et les **jours fériés**
+- **Mode absence** : alertes permanentes quelle que soit l'heure
 
-1. Aller dans `Outils → Gérer les bibliothèques`
-2. Rechercher `ESP32Servo`
-3. Installer **ESP32Servo by Kevin Harrington**
-
-> Toutes les autres bibliothèques (`esp_camera.h`, `WiFi.h`, `Preferences.h`, etc.) sont déjà 
-> incluses automatiquement avec le package ESP32 installé à l'étape 1. Aucune installation 
-> supplémentaire n'est nécessaire pour elles.
-
----
-
-### Étape 3 — Créer et importer le modèle IA Edge Impulse
-
-C'est l'étape la plus importante et la plus spécifique à ce projet. Le fichier 
-`EconomieEnergieBBITEST_inferencing.h` n'est pas une bibliothèque que l'on télécharge — 
-c'est un modèle d'intelligence artificielle que **tu dois entraîner toi-même** sur la plateforme 
-Edge Impulse, puis exporter pour Arduino.
-
-#### Pourquoi entraîner son propre modèle ?
-
-Le modèle IA doit être capable de reconnaître des personnes dans les conditions spécifiques 
-de ton environnement : l'angle de ta caméra, l'éclairage de ta pièce, la distance de détection 
-souhaitée. Un modèle générique ne donnera pas de bons résultats. C'est pourquoi chaque 
-déploiement nécessite son propre modèle entraîné.
-
-#### Vidéo de référence
-
-Il n'existe pas encore de vidéo officielle montrant exactement comment créer un modèle de 
-détection de personnes pour ESP32-CAM avec Edge Impulse. Cependant, la méthode est 
-identique à la détection d'autres objets. Cette vidéo montre le processus complet et peut 
-être suivie en adaptant les données d'entraînement à des personnes :
-
-> 📺 **[Tutoriel Edge Impulse pour ESP32-CAM — Object Detection](https://youtu.be/L2w160DwM2k?si=M9mHNzR2tXxbDf5D)**
-
-#### Étapes pour créer le modèle
-
-1. Créer un compte gratuit sur [edgeimpulse.com](https://edgeimpulse.com)
-2. Créer un nouveau projet
-3. Aller dans **Data acquisition** → collecter des images avec ta caméra ESP32-CAM :
-   - Des images avec une personne présente dans le champ → étiqueter `personne`
-   - Des images sans personne → étiqueter `rien`
-   - Collecter au minimum 50 à 100 images par catégorie pour un bon résultat
-4. Aller dans **Impulse design** → créer le pipeline :
-   - Input : Image 96x96 pixels (ou 160x120)
-   - Processing block : Image
-   - Learning block : Transfer Learning (Images)
-5. Aller dans **Training** → lancer l'entraînement
-6. Vérifier les performances dans **Model testing**
-7. Aller dans **Deployment** → sélectionner **Arduino library**
-8. Cliquer sur **Build** → télécharger le fichier `.zip`
-
-#### Importer la bibliothèque dans Arduino IDE
-
-1. Dans Arduino IDE : `Croquis → Inclure une bibliothèque → Ajouter la bibliothèque .ZIP`
-2. Sélectionner le fichier `.zip` téléchargé depuis Edge Impulse
-3. La bibliothèque apparaît maintenant dans la liste — le projet peut être compilé
-
-#### Cloner le modèle utilisé dans ce projet
-
-Si tu veux partir directement du modèle entraîné pour ce projet comme point de départ :
-
-> 🔗 **[Cloner le projet Edge Impulse — EconomieEnergieBBITEST](https://studio.edgeimpulse.com/studio/944878/impulse/1/learning/keras-object-detection/7)**
-
-
-
-Pour rendre ton projet Edge Impulse public et obtenir ce lien :
-`Edge Impulse → Ton projet → Dashboard → Make public`
+### Robustesse et fiabilité
+- Architecture **FreeRTOS** avec répartition des tâches sur les **deux cœurs** de l'ESP32
+- **Watchdog** : redémarrage automatique en cas de blocage (délai 60 secondes)
+- Synchronisation de l'heure via **NTP** pour une gestion précise des plages horaires
+- Accès à distance via **tunnel ngrok**
 
 ---
 
-### Étape 4 — Configurer et flasher
+## 🔧 Matériel requis
 
-1. Ouvrir `src/main.ino` dans Arduino IDE
-2. Modifier les identifiants WiFi :
-```cpp
-   const char* wifi_ssid     = "VOTRE_RESEAU_WIFI";
-   const char* wifi_password = "VOTRE_MOT_DE_PASSE";
+| Composant | Rôle | Broche |
+|---|---|---|
+| **ESP32-CAM AI Thinker** | Cerveau du système — capture, IA, WiFi | — |
+| **OV2640** (intégrée) | Caméra 2 mégapixels | — |
+| **ESP32-CAM-MB** | Programmateur USB (port Micro-USB + boutons BOOT/RESET) | — |
+| **Servomoteur** | Rotation panoramique de la caméra (0°–100°) | GPIO 13 |
+| **Module double relais** | Contrôle des équipements électriques + va-et-vient | GPIO 14 |
+| **Capteur LDR** | Vérification de l'état réel de la lumière | GPIO 15 |
+| **Résistance 5 kΩ** | Pont diviseur pour lecture numérique de la LDR (ADC désactivé par la caméra) | — |
+| **Carte microSD** | Enregistrement des photos horodatées | Slot intégré |
+| **2 chargeurs USB 5V/2A** | Alimentation séparée (ESP32+LDR / servomoteur+relais) | — |
+
+> **Note alimentation :** Deux alimentations séparées aux masses reliées sont indispensables pour éviter que les pics de consommation lors des commutations du relais ne perturbent l'ESP32-CAM.
+
+---
+
+## 🏗️ Architecture du système
+
+Le système s'articule autour de trois grandes parties :
+
 ```
-3. Connecter l'ESP32-CAM via l'adaptateur FTDI avec **GPIO0 relié à GND** (mode flash)
-4. Sélectionner le bon port : `Outils → Port`
-5. Téléverser le code
-6. Débrancher GPIO0 de GND, appuyer sur le bouton Reset
-7. Ouvrir le moniteur série à **115200 bauds** pour voir l'adresse IP
+┌─────────────────────────────────────────────────────────┐
+│                     ACQUISITION                         │
+│  Caméra OV2640 sur servomoteur  +  Capteur LDR          │
+└─────────────────────────┬───────────────────────────────┘
+                          │
+┌─────────────────────────▼───────────────────────────────┐
+│              TRAITEMENT ET DÉCISION (ESP32-CAM)          │
+│  Modèle IA FOMO  →  Seuil 90%  →  Double détection      │
+│  FreeRTOS : Cœur 1 (capture) / Cœur 0 (IA + WiFi)       │
+└──────────┬──────────────────────────────┬───────────────┘
+           │                              │
+┌──────────▼──────────┐      ┌────────────▼───────────────┐
+│  ACTION PHYSIQUE    │      │  COMMUNICATION              │
+│  Relais → équipem.  │      │  Interface web (MJPEG)      │
+│  Servomoteur 0-100° │      │  Alertes Telegram           │
+│  Enregistrement SD  │      │  Tunnel ngrok               │
+└─────────────────────┘      └────────────────────────────┘
+```
+
+### Répartition FreeRTOS sur les deux cœurs
+
+| Cœur | Tâche | Rôle |
+|---|---|---|
+| **Cœur 1** | Capture rapide | Capture et préparation des images en continu |
+| **Cœur 0** | Inférence IA | Analyse IA, contrôle du relais et du servomoteur |
+| **Cœur 0** | WiFi et serveurs | Connexion réseau, interface web, alertes Telegram |
+
+Les accès aux ressources partagées (tampon d'images, état de la lumière, position servomoteur) sont protégés par des **mutex** et des **sémaphores** FreeRTOS.
 
 ---
 
-### Étape 5 — Accéder à l'interface
-Interface principale  →  http://[IP_ESP32]/
-Diagnostics système   →  http://[IP_ESP32]/health
-Flux vidéo direct     →  http://[IP_ESP32]:81/stream
+## 🤖 Modèle IA embarquée
 
-Accessible depuis tout navigateur (téléphone ou ordinateur) connecté au même réseau WiFi.
+Le modèle est entraîné sur **Edge Impulse**, une plateforme gratuite spécialisée pour l'IA sur microcontrôleurs.
 
----
+### Données d'entraînement
+- **740 images** capturées directement dans la salle du FabLab du BBI
+- Conditions variées : personnes assises, debout, partiellement visibles, lumière allumée ou éteinte
+- Étiquetage manuel avec bounding boxes autour de chaque personne
 
-## API disponible
+### Pipeline Edge Impulse
+1. **Collecte** : capture depuis navigateur via la bibliothèque EloquentESPCam
+2. **Étiquetage** : bounding boxes autour de chaque personne (images vides sans rectangle)
+3. **Impulsion** : images 96×96 pixels — modèle FOMO (optimisé pour microcontrôleurs)
+4. **Entraînement** : score F1 = **83,1%** après ajout d'images ciblées et révision des étiquettes
+5. **Déploiement** : bibliothèque Arduino ZIP → importée directement dans l'IDE Arduino
 
-| Endpoint | Action |
-|----------|--------|
-| `GET /` | Interface web principale |
-| `GET /light/on` | Allumer la lumière (mode manuel) |
-| `GET /light/off` | Éteindre la lumière (mode manuel) |
-| `GET /light/auto` | Retour au mode automatique IA |
-| `GET /servo/left` | Tourner le servo à gauche (−10°) |
-| `GET /servo/right` | Tourner le servo à droite (+10°) |
-| `GET /status` | État complet du système |
-| `GET /health` | Diagnostics détaillés |
-| `GET :81/stream` | Flux vidéo MJPEG en direct |
+### Mécanisme de fiabilisation
 
----
-
-## Structure du dépôt
-esp32cam-detection-lumiere/
-├── README.md               ← Ce fichier
-├── RAPPORT.md              ← Contexte, impact et présentation du projet
-├── LICENSE
-├── src/
-│   └── main.ino            ← Code source principal
-├── hardware/
-│   ├── schema_cablage.png  ← Schéma de câblage
-│   └── composants.md       ← Liste complète du matériel
-└── assets/
-├── demo.gif            ← Démonstration animée
-└── screenshots/        ← Captures de l'interface web
+```
+Image capturée toutes les 2 secondes
+         │
+         ▼
+Confiance IA > 90% ?
+    NON → Ignoré
+    OUI → Compteur ++
+         │
+         ▼
+2 détections positives en moins de 10s ?
+    NON → Pas de validation
+    OUI → Présence confirmée → Équipements allumés
+```
 
 ---
 
-## Auteur
+## ⚙️ Modes de fonctionnement
 
-Développé par **[ZADUS]**
-Centre d'incubation — Afrique de l'Ouest, 2025
-
-- Contact : [nexteliumservice@gmail.com]
--whatsapp[+226 67250288]
+| Mode | Description |
+|---|---|
+| **Automatique** (défaut) | L'IA prend toutes les décisions — allumage sur détection, extinction après 4 min d'inactivité |
+| **Manuel physique** | Contrôle via l'interrupteur mural existant (cohabite naturellement avec le système) |
+| **Manuel web** | Contrôle à distance depuis l'interface web — retour automatique en mode automatique après 4 min |
+| **Mode absence** | Alertes Telegram permanentes quelle que soit l'heure dès qu'une présence est détectée |
 
 ---
 
-## Licence
+## 🛠️ Installation et configuration
 
-Ce projet est distribué sous licence MIT.
-Libre de l'utiliser, le modifier et le redistribuer avec attribution.
+### Prérequis logiciels
+- [Arduino IDE](https://www.arduino.cc/en/software) avec le package **ESP32 by Espressif Systems**
+- Bibliothèque **Edge Impulse** exportée depuis votre projet Edge Impulse (format ZIP Arduino)
+- Compte [Telegram](https://telegram.org) pour les alertes (API gratuite)
+- [ngrok](https://ngrok.com) pour l'accès à distance (optionnel)
 
+### Bibliothèques Arduino nécessaires
+```
+- ESP32 by Espressif Systems (via gestionnaire de cartes)
+- EloquentESPCam
+- FreeRTOS (inclus dans le package ESP32)
+- Bibliothèque Edge Impulse exportée (EconomieEnergieBBITEST.zip)
+```
 
+### Étapes d'installation
 
+**1. Cloner le dépôt**
+```bash
+git clone https://github.com/Zadus-Next-Helium-Service/Economie_Energie_Camera_ESP32CAM.git
+cd Economie_Energie_Camera_ESP32CAM
+```
 
+**2. Configurer les paramètres réseau et Telegram**
 
-# Economie_Energie_Camera_ESP32CAM
-“Système IoT basé sur ESP32-CAM pour une maison intelligente : surveillance vidéo avec détection de personnes, contrôle d’éclairage à distance, optimisation énergétique et automatisation domotique. Intègre capteurs LDR pour une gestion intelligente de la présence et de la luminosité.
+Dans le fichier de configuration, renseigner :
+```cpp
+// Réseau WiFi
+const char* ssid     = "VOTRE_SSID";
+const char* password = "VOTRE_MOT_DE_PASSE";
+
+// Adresse IP fixe (à configurer aussi côté routeur)
+IPAddress local_IP(192, 168, X, X);
+
+// Telegram
+const String BOT_TOKEN = "VOTRE_TOKEN_BOT";
+const String CHAT_ID   = "VOTRE_CHAT_ID";
+```
+
+**3. Importer la bibliothèque Edge Impulse**
+
+Dans Arduino IDE : `Croquis → Inclure une bibliothèque → Ajouter une bibliothèque .ZIP`  
+→ Sélectionner `EconomieEnergieBBITEST.zip`
+
+**4. Sélectionner la carte et téléverser**
+
+```
+Outils → Type de carte → AI Thinker ESP32-CAM
+Outils → Port → (port COM de votre ESP32-CAM-MB)
+```
+Appuyer sur **BOOT** pendant le téléversement si nécessaire, puis **RESET** pour démarrer.
+
+### Câblage
+
+```
+ESP32-CAM GPIO 13  →  Signal servomoteur
+ESP32-CAM GPIO 14  →  Signal module double relais
+ESP32-CAM GPIO 15  →  Point milieu pont diviseur LDR (résistance 5kΩ en série)
+GND commun entre les deux alimentations
+```
+
+> ⚠️ **Important :** Utiliser deux alimentations 5V/2A séparées avec masses reliées. Ne pas alimenter le servomoteur et le relais depuis la même source que l'ESP32-CAM.
+
+---
+
+## 🌐 Interface web
+
+Une fois le système démarré et connecté au WiFi, l'interface est accessible depuis tout navigateur :
+
+```
+http://192.168.X.X       → Interface principale + flux vidéo
+http://192.168.X.X:81    → Flux MJPEG seul
+http://192.168.X.X/health → Diagnostics (uptime, mémoire heap, NTP, détections)
+```
+
+**Fonctionnalités de l'interface :**
+- Visualisation du flux vidéo en temps réel
+- Contrôle du relais (allumage/extinction)
+- Déplacement du servomoteur (pas de 10°)
+- Basculement entre mode automatique et mode manuel
+- Activation/désactivation du mode absence
+- Gestion de la liste des jours fériés
+
+Pour un accès depuis l'extérieur du réseau local, utiliser ngrok :
+```bash
+ngrok http 80
+```
+
+---
+
+## 📬 Alertes Telegram
+
+Le système envoie automatiquement une alerte Telegram dans les cas suivants :
+
+- **La nuit** (22h–6h) : dès qu'une présence est détectée
+- **Les weekends** : dès qu'une présence est détectée
+- **Les jours fériés** : liste configurable depuis l'interface web
+- **Mode absence** : toute détection, 24h/24
+
+Chaque alerte contient :
+- Une **photo** de la détection
+- Le **lien direct** vers l'interface web
+
+L'heure est synchronisée automatiquement via **NTP** au démarrage.
+
+---
+
+## 📊 Résultats obtenus
+
+| Fonctionnalité | Statut |
+|---|---|
+| Flux MJPEG en temps réel | ✅ Réalisé |
+| Détection IA embarquée (FOMO, score F1 83,1%) | ✅ Réalisé |
+| Double validation (2 détections / 10s) | ✅ Réalisé |
+| Contrôle automatique via relais | ✅ Réalisé |
+| Extinction automatique après 4 min | ✅ Réalisé |
+| Balayage servomoteur 0°–100° | ✅ Réalisé |
+| Interface web embarquée | ✅ Réalisé |
+| Mode manuel physique (va-et-vient) | ✅ Réalisé |
+| Mode manuel web | ✅ Réalisé |
+| Mode nuit automatique (NTP 22h–6h) | ✅ Réalisé |
+| Mode absence | ✅ Réalisé |
+| Alertes Telegram (photo + lien) | ✅ Réalisé |
+| Enregistrement SD horodaté | ✅ Réalisé |
+| Gestion jours fériés (interface web) | ✅ Réalisé |
+| Accès à distance (tunnel ngrok) | ✅ Réalisé |
+| Watchdog (redémarrage automatique 60s) | ✅ Réalisé |
+| Boîtier 3D (FreeCAD + impression FabLab) | ✅ Réalisé |
+
+---
+
+## 🔭 Perspectives d'amélioration
+
+- Amélioration du modèle IA par un jeu de données plus varié (score F1 cible > 90%)
+- Intégration d'une **batterie de secours** pour les coupures fréquentes au Burkina Faso
+- Déploiement de ngrok sur **Raspberry Pi** pour un accès à distance totalement autonome
+- Développement d'une **application mobile** dédiée
+- Conception d'un **PCB dédié** pour un système plus compact et commercialisable
+- Extension du contrôle à d'autres équipements via capteur de courant **ACS712**
+- Déploiement dans d'autres structures burkinabè (écoles, bureaux, commerces)
+
+---
+
+## 🎥 Démonstrations
+
+Les vidéos de démonstration du système en conditions réelles sont disponibles ici :  
+👉 [Voir les vidéos de démonstration](https://github.com/Zadus-Next-Helium-Service/Economie_Energie_Camera_ESP32CAM/tree/main/videos)
+
+---
+
+## 👤 Auteur
+
+**ZANRE Abasse DIMITRI**  
+Licence Professionnelle en Génie Électrique — Option Électronique et Informatique Industrielle  
+Université de Technologies et de Management (UTM) — Ouagadougou, Burkina Faso  
+Stage réalisé au **FabLab du Burkina Business Incubator (BBI)**  
+Maître de stage : **OUEDRAOGO Mohamed Bassirou**, FabLab Manager
+
+---
+
+*Réalisé entièrement depuis le Burkina Faso, avec des composants disponibles localement, sans dépendance à des services cloud étrangers.*
